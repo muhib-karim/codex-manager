@@ -532,7 +532,7 @@ curl http://localhost:8080/v1/chat/completions \
 
 MIT License - See [LICENSE](LICENSE) file
 
-Copyright (c) 2025 ai-dev-2024
+Copyright (c) 2025 Muhib Karim
 
 ---
 

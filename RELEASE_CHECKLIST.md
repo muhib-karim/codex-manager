@@ -1,5 +1,9 @@
 # 🚀 Codex Manager v0.3.0 - Release Ready
 
+> **Note:** this is an early release-planning checklist. The project is a work-in-progress
+> prototype and the Rust backend does not compile yet; see the [README](README.md#roadmap--known-limitations)
+> for the current status.
+
 ## ✅ Project Complete
 
 **Codex Manager** has been fully developed matching Antigravity Manager's architecture:
@@ -290,7 +294,7 @@ npm run tauri build
 
 MIT License - See LICENSE file
 
-**Copyright (c) 2025 ai-dev-2024**
+**Copyright (c) 2025 Muhib Karim**
 
 ---
 

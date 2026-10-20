@@ -23,6 +23,9 @@ OpenAI API keys. It is designed to:
 - expose a local OpenAI-compatible proxy (`http://127.0.0.1:8080/v1`) that picks an account for each
   request using a routing strategy.
 
+The point is that clients see a single endpoint and key, while the app spreads requests across
+accounts by usage, limits and priority, and skips accounts that are disabled or failing.
+
 > **Project status: work-in-progress prototype.** The React UI builds, type-checks and has a unit-test
 > suite that runs in CI. The Rust backend is written but **does not compile yet**, and the UI is not
 > yet wired to it (account state is in-memory in the browser). See [Roadmap / known limitations](#roadmap--known-limitations).
