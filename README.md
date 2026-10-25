@@ -150,6 +150,16 @@ codex-manager/
 - OpenAI's `/v1/dashboard/billing/*` endpoints used for usage polling are not part of the
   documented public API and may not work with standard API keys.
 
+## Tech stack
+
+- **Language:** Rust
+- **Frameworks and tools:** Rust (Cargo), React, Tauri, Vite, Tailwind CSS, TypeScript, Vitest
+- **CI:** GitHub Actions
+
+## Contributing
+
+Issues and pull requests are welcome. Before opening a pull request, run `cargo test` and `npm test`. Please keep each pull request focused and say how you tested it.
+
 ## License
 
 [MIT](LICENSE) © 2026 Muhib Al Karim
