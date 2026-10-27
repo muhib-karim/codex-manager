@@ -2,6 +2,9 @@
 
 This guide shows how to configure OpenCode to use Codex Account Manager for multi-account OpenAI API management.
 
+> **Note:** the commands below target the standalone CLI prototype (root `Cargo.toml`), which does not
+> compile yet. See the [README](../README.md#roadmap--known-limitations) for the current status.
+
 ## Overview
 
 Codex Account Manager provides a local proxy server that:
@@ -20,8 +23,7 @@ OpenCode sees only one endpoint, while Codex Account Manager handles the complex
 # Install (from source)
 cargo install --path .
 
-# Or download pre-built binary
-# TODO: Add release links when available
+# No pre-built binaries are published yet
 ```
 
 ### 2. Add Your OpenAI Accounts
@@ -314,6 +316,6 @@ codex-account-manager
 
 ## Questions?
 
-- Check the [README](README.md) for general documentation
+- Check the [README](../README.md) for general documentation
 - Review routing strategies in the architecture docs
 - Open an issue for bugs or feature requests

@@ -1,11 +1,11 @@
 import { Github, ExternalLink, Heart, Command } from 'lucide-react';
 
 export default function About() {
-    const version = '1.0.0';
+    const version = '0.3.0';
 
     return (
         <div className="max-w-2xl mx-auto">
-        
+
             {/* Logo */}
             <div className="text-center mb-8">
                 <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-3xl shadow-xl mb-6">
@@ -28,7 +28,7 @@ export default function About() {
                     About
                 </h2>
                 <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
-                    Codex Manager is a powerful desktop application for managing multiple OpenAI API accounts. 
+                    Codex Manager is a powerful desktop application for managing multiple OpenAI API accounts.
                     It provides an intuitive interface for account switching, quota monitoring, and proxy configuration.
                 </p>
             </div>
@@ -72,7 +72,7 @@ export default function About() {
                         Tauri v2
                     </span>
                     <span className="px-3 py-1 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg text-sm">
-                        React 18
+                        React 19
                     </span>
                     <span className="px-3 py-1 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg text-sm">
                         TypeScript
@@ -89,11 +89,11 @@ export default function About() {
             {/* Links */}
             <div className="flex gap-4">
                 <a
-                    href="https://github.com"
+                    href="https://github.com/muhib-karim/codex-manager"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex-1 flex items-center justify-center gap-2 p-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl hover:border-blue-300 dark:hover:border-blue-700 transition-all">
-                
+                    className="flex-1 flex items-center justify-center gap-2 p-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl hover:border-blue-300 dark:hover:border-blue-700 transition-all"
+                >
                     <Github className="w-5 h-5 text-gray-600 dark:text-gray-400" />
                     <span className="text-gray-700 dark:text-gray-300 font-medium">
                         GitHub
@@ -108,7 +108,7 @@ export default function About() {
                     Made with <Heart className="w-4 h-4 text-rose-500 fill-rose-500" /> for developers
                 </p>
                 <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
-                    © 2024 Codex Manager. All rights reserved.
+                    Released under the MIT License.
                 </p>
             </div>
         </div>
