@@ -25,6 +25,10 @@ OpenAI API keys. The design:
 Clients see one endpoint and one key; the app spreads requests across accounts by usage, limits and
 priority, and skips accounts that are disabled, over their limit or failing.
 
+![Codex Manager dashboard (browser build, no accounts added)](docs/screenshot.png)
+
+*The React UI running in the browser build. It is not wired to the Rust backend yet (see below).*
+
 ## Project status
 
 **Work-in-progress prototype. Not ready for real API keys or daily use.**
