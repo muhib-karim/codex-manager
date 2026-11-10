@@ -5,25 +5,26 @@ use tauri::{
 };
 use tracing::info;
 
-pub fn create_tray<R: Runtime>(app: &tauri::AppHandle<R>) -> Result<(), Box<dyn std::error::Error>> {
-    // Create menu items
+/// Create the system tray icon with Show / Hide / Quit entries. The main
+/// window hides instead of closing, so the tray is how it is reopened.
+pub fn create_tray<R: Runtime>(
+    app: &tauri::AppHandle<R>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let show_i = MenuItem::with_id(app, "show", "Show", true, None::<&str>)?;
     let hide_i = MenuItem::with_id(app, "hide", "Hide", true, None::<&str>)?;
     let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-    
-    let menu = Menu::with_items(
-        app,
-        &[
-            &show_i,
-            &hide_i,
-            &PredefinedMenuItem::separator(app)?,
-            &quit_i,
-        ],
-    )?;
+    let separator = PredefinedMenuItem::separator(app)?;
 
-    let tray = TrayIconBuilder::new()
+    let menu = Menu::with_items(app, &[&show_i, &hide_i, &separator, &quit_i])?;
+
+    let mut builder = TrayIconBuilder::<R>::new()
         .menu(&menu)
-        .show_menu_on_left_click(false)
+        .show_menu_on_left_click(false);
+    if let Some(icon) = app.default_window_icon() {
+        builder = builder.icon(icon.clone());
+    }
+
+    let _tray = builder
         .on_menu_event(|app, event| match event.id.as_ref() {
             "show" => {
                 if let Some(window) = app.get_webview_window("main") {
@@ -57,10 +58,6 @@ pub fn create_tray<R: Runtime>(app: &tauri::AppHandle<R>) -> Result<(), Box<dyn 
         })
         .build(app)?;
 
-    info!("System tray created successfully");
-    
-    // Keep tray alive
-    let _ = tray;
-    
+    info!("System tray created");
     Ok(())
 }
