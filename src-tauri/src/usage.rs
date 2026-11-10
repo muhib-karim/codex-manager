@@ -384,7 +384,7 @@ mod tests {
 
     #[test]
     fn billing_response_tolerates_missing_fields() {
-        let parsed: BillingUsageResponse = serde_json::from_str("{}").unwrap();
+        let parsed: BillingUsageResponse = serde_json::from_value(serde_json::json!({})).unwrap();
         let (monthly, daily) = summarize_billing(&parsed, 0);
         assert_eq!(monthly, 0.0);
         assert_eq!(daily, 0.0);
