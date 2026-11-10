@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { OpenAIAccount } from '../types/account';
+import { serializeAccountsForExport } from '../utils/accountList';
 
 // NOTE: this store currently keeps accounts in memory only. The Rust backend
 // commands (list_accounts, add_account, ...) are not wired up to the UI yet.
@@ -48,11 +49,19 @@ export const useAccountStore = create<AccountState>((set, get) => ({
   },
 
   addAccount: async (input) => {
-    const account: OpenAIAccount = { ...input, id: newId(), createdAt: nowSeconds() };
-    set(state => {
-      const accounts = [...state.accounts, account];
-      return { accounts, currentAccount: state.currentAccount ?? account };
-    });
+    // The first account becomes the current one, and is marked active so the
+    // "current" card, the Active filter and the stats agree with each other.
+    const becomesCurrent = get().currentAccount === null && !input.disabled;
+    const account: OpenAIAccount = {
+      ...input,
+      id: newId(),
+      createdAt: nowSeconds(),
+      isActive: becomesCurrent,
+    };
+    set(state => ({
+      accounts: [...state.accounts, account],
+      currentAccount: becomesCurrent ? account : state.currentAccount,
+    }));
     return account;
   },
 
@@ -85,13 +94,15 @@ export const useAccountStore = create<AccountState>((set, get) => ({
   toggleAccountStatus: async (id, enable, reason) => {
     if (!get().accounts.some(a => a.id === id)) throw new Error(`Account ${id} not found`);
     set(state => {
+      // A disabled account cannot stay the active/current one.
       const accounts = state.accounts.map(a =>
-        a.id === id ? { ...a, disabled: !enable, disabledReason: enable ? undefined : reason } : a
+        a.id === id
+          ? { ...a, disabled: !enable, disabledReason: enable ? undefined : reason, isActive: enable ? a.isActive : false }
+          : a
       );
-      const currentAccount = state.currentAccount
-        ? accounts.find(a => a.id === state.currentAccount!.id) ?? null
-        : null;
-      return { accounts, currentAccount };
+      const currentId = state.currentAccount?.id;
+      const current = currentId ? accounts.find(a => a.id === currentId) ?? null : null;
+      return { accounts, currentAccount: current && !current.disabled ? current : null };
     });
   },
 
@@ -102,5 +113,6 @@ export const useAccountStore = create<AccountState>((set, get) => ({
 
   refreshAllQuotas: async () => {},
 
-  exportAccounts: async () => JSON.stringify(get().accounts, null, 2),
+  // One export format everywhere: only the fields needed to re-import.
+  exportAccounts: async () => serializeAccountsForExport(get().accounts),
 }));

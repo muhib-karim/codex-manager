@@ -9,6 +9,9 @@ import AddAccountDialog from '../components/accounts/AddAccountDialog';
 import { showToast } from '../components/common/ToastContainer';
 import { formatNumber } from '../utils/format';
 import { cn } from '../utils/cn';
+import { computeAccountStats, formatPercent } from '../utils/quota';
+import { serializeAccountsForExport } from '../utils/accountList';
+import { REFRESH_INTERVAL_RANGE } from '../utils/settings';
 
 export default function Dashboard() {
     const navigate = useNavigate();
@@ -30,52 +33,23 @@ export default function Dashboard() {
     useEffect(() => {
         fetchAccounts();
         fetchCurrentAccount();
-    }, []);
+    }, [fetchAccounts, fetchCurrentAccount]);
 
     // Auto-refresh quotas every 5 minutes
     useEffect(() => {
         if (!config.autoRefresh) return;
         
+        // Never schedule faster than the minimum: a zero or negative delay
+        // would make the timer fire continuously.
+        const minutes = Math.max(REFRESH_INTERVAL_RANGE.min, Number(config.refreshInterval) || REFRESH_INTERVAL_RANGE.min);
         const interval = setInterval(() => {
             fetchAccounts();
-        }, config.refreshInterval * 60 * 1000);
+        }, minutes * 60 * 1000);
 
         return () => clearInterval(interval);
     }, [config.autoRefresh, config.refreshInterval, fetchAccounts]);
 
-    const stats = useMemo(() => {
-        const total = accounts.length;
-        const active = accounts.filter(a => a.isActive).length;
-        const disabled = accounts.filter(a => a.disabled).length;
-        const lowQuota = accounts.filter(a => {
-            const quota = a.quota?.remainingRequests || 0;
-            const total = a.quota?.totalRequests || 1;
-            return (quota / total) < 0.2;
-        }).length;
-
-        const totalRequests = accounts.reduce((sum, a) => sum + (a.usage?.dailyRequests || 0), 0);
-        const totalTokens = accounts.reduce((sum, a) => sum + (a.usage?.dailyTokens || 0), 0);
-
-        const avgQuota = accounts.length > 0
-            ? Math.round(
-                accounts.reduce((sum, a) => {
-                    const quota = a.quota?.remainingRequests || 0;
-                    const total = a.quota?.totalRequests || 1;
-                    return sum + (quota / total) * 100;
-                }, 0) / accounts.length
-            )
-            : 0;
-
-        return {
-            total,
-            active,
-            disabled,
-            lowQuota,
-            totalRequests,
-            totalTokens,
-            avgQuota,
-        };
-    }, [accounts]);
+    const stats = useMemo(() => computeAccountStats(accounts), [accounts]);
 
     const handleSwitch = async (accountId: string) => {
         try {
@@ -96,7 +70,7 @@ export default function Dashboard() {
         setIsRefreshing(true);
         try {
             await refreshQuota(currentAccount.id);
-            showToast('Quota refreshed', 'success');
+            showToast('Usage refresh is not connected to the backend yet', 'info');
         } catch (error) {
             showToast(`Failed to refresh: ${error}`, 'error');
         } finally {
@@ -106,15 +80,22 @@ export default function Dashboard() {
 
     const handleExport = async () => {
         try {
-            const data = await useAccountStore.getState().exportAccounts();
+            if (accounts.length === 0) {
+                showToast('There are no accounts to export', 'info');
+                return;
+            }
+            // Same format as the Accounts page export.
+            const data = serializeAccountsForExport(accounts);
             const blob = new Blob([data], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
             a.download = `codex-accounts-${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
             a.click();
-            URL.revokeObjectURL(url);
-            showToast('Accounts exported', 'success');
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            showToast(`Exported ${accounts.length} account(s). The file contains API keys in plain text.`, 'warning', 6000);
         } catch (error) {
             showToast(`Export failed: ${error}`, 'error');
         }
@@ -168,7 +149,7 @@ export default function Dashboard() {
                             <Zap className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                         </div>
                     </div>
-                    <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.avgQuota}%</div>
+                    <div className="text-2xl font-bold text-gray-900 dark:text-white">{formatPercent(stats.avgQuota)}</div>
                     <div className="text-xs text-gray-500 dark:text-gray-400">Avg Quota</div>
                 </div>
 

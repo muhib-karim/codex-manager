@@ -21,14 +21,18 @@ export function formatPercentage(value: number, total: number): number {
     return Math.round((value / total) * 100);
 }
 
-export function getQuotaColor(percentage: number): 'success' | 'warning' | 'error' | 'neutral' {
+/**
+ * Severity for a remaining-quota percentage. `null` means the quota is
+ * unknown (neutral); an exhausted quota (0) is an error, not neutral.
+ */
+export function getQuotaColor(percentage: number | null): 'success' | 'warning' | 'error' | 'neutral' {
+    if (percentage === null || Number.isNaN(percentage)) return 'neutral';
     if (percentage >= 50) return 'success';
     if (percentage >= 20) return 'warning';
-    if (percentage > 0) return 'error';
-    return 'neutral';
+    return 'error';
 }
 
-export function getQuotaColorClass(percentage: number): string {
+export function getQuotaColorClass(percentage: number | null): string {
     const color = getQuotaColor(percentage);
     switch (color) {
         case 'success':
@@ -45,6 +49,7 @@ export function getQuotaColorClass(percentage: number): string {
 export function formatTimeRemaining(dateStr: string | undefined): string {
     if (!dateStr) return 'N/A';
     const target = new Date(dateStr);
+    if (Number.isNaN(target.getTime())) return 'N/A';
     const now = new Date();
     const diffMs = target.getTime() - now.getTime();
 
@@ -86,7 +91,11 @@ export function truncate(str: string, length: number): string {
     return str.slice(0, length) + '...';
 }
 
+/**
+ * Mask an API key for display. Keys shorter than 16 characters are hidden
+ * completely: showing 8 characters of a short key would reveal most of it.
+ */
 export function maskApiKey(key: string): string {
-    if (key.length <= 8) return '****';
+    if (key.length < 16) return '****';
     return key.slice(0, 4) + '****' + key.slice(-4);
 }

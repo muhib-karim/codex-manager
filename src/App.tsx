@@ -6,27 +6,26 @@ import Accounts from './pages/Accounts';
 import Settings from './pages/Settings';
 import About from './pages/About';
 import { useConfigStore } from './stores/useConfigStore';
+import { applyTheme } from './utils/settings';
 
 function App() {
-    const { config, loadConfig } = useConfigStore();
+    const theme = useConfigStore(state => state.config.theme);
+    const loadConfig = useConfigStore(state => state.loadConfig);
 
     useEffect(() => {
         loadConfig();
-    }, []);
+    }, [loadConfig]);
 
-    // Apply theme on mount and when config changes
+    // Apply the theme on mount, when the setting changes, and when the OS
+    // preference changes while the setting is "system".
     useEffect(() => {
-        if (!config) return;
-        
-        const root = document.documentElement;
-        let theme = config.theme;
-        
-        if (theme === 'system') {
-            theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-        }
-        
-        root.classList.toggle('dark', theme === 'dark');
-    }, [config?.theme]);
+        const media = window.matchMedia('(prefers-color-scheme: dark)');
+        const apply = () => applyTheme(document.documentElement, theme, media.matches);
+        apply();
+        if (theme !== 'system') return;
+        media.addEventListener('change', apply);
+        return () => media.removeEventListener('change', apply);
+    }, [theme]);
 
     return (
         <BrowserRouter>

@@ -5,14 +5,18 @@ export function useTauri<T>(command: string, args?: Record<string, unknown>) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  // Serialized so the effect re-runs when the argument values change, not
+  // whenever the caller passes a new object with the same contents.
+  const argsKey = JSON.stringify(args ?? null);
 
   useEffect(() => {
     let isMounted = true;
+    const parsedArgs = JSON.parse(argsKey) as Record<string, unknown> | null;
 
     const fetchData = async () => {
       try {
         setIsLoading(true);
-        const result = await invoke<T>(command, args);
+        const result = await invoke<T>(command, parsedArgs ?? undefined);
         if (isMounted) {
           setData(result);
           setError(null);
@@ -33,7 +37,7 @@ export function useTauri<T>(command: string, args?: Record<string, unknown>) {
     return () => {
       isMounted = false;
     };
-  }, [command, JSON.stringify(args)]);
+  }, [command, argsKey]);
 
   return { data, error, isLoading };
 }

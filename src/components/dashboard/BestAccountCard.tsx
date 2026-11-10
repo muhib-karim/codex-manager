@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { ArrowRightLeft, Crown } from 'lucide-react';
 import { OpenAIAccount } from '../../types/account';
 import { formatNumber, getQuotaColorClass } from '../../utils/format';
+import { formatPercent, pickBestAccount, ratioToPercent, requestQuotaRatio } from '../../utils/quota';
 import { cn } from '../../utils/cn';
 
 interface BestAccountCardProps {
@@ -17,18 +18,8 @@ export default function BestAccountCard({
     onSwitch,
     isLoading 
 }: BestAccountCardProps) {
-    const bestAccount = useMemo(() => {
-        // Find account with highest remaining quota percentage
-        return accounts
-            .filter(a => !a.disabled)
-            .sort((a, b) => {
-                const aQuota = a.quota?.remainingRequests || 0;
-                const aTotal = a.quota?.totalRequests || 1;
-                const bQuota = b.quota?.remainingRequests || 0;
-                const bTotal = b.quota?.totalRequests || 1;
-                return (bQuota / bTotal) - (aQuota / aTotal);
-            })[0];
-    }, [accounts]);
+    // Enabled account with the most quota left; never an exhausted one.
+    const bestAccount = useMemo(() => pickBestAccount(accounts), [accounts]);
 
     if (!bestAccount) {
         return (
@@ -46,9 +37,8 @@ export default function BestAccountCard({
         );
     }
 
-    const quotaPercentage = bestAccount.quota?.remainingRequests && bestAccount.quota?.totalRequests
-        ? Math.round((bestAccount.quota.remainingRequests / bestAccount.quota.totalRequests) * 100)
-        : 0;
+    // null when the quota is unknown: shown as "N/A" with an empty bar.
+    const quotaPercentage = ratioToPercent(requestQuotaRatio(bestAccount.quota));
 
     const isCurrent = bestAccount.id === currentAccountId;
 
@@ -82,7 +72,7 @@ export default function BestAccountCard({
                 <div className="space-y-2">
                     <div className="flex justify-between text-sm">
                         <span className="text-gray-500 dark:text-gray-400">Quota Remaining</span>
-                        <span className="font-medium text-gray-700 dark:text-gray-300">{quotaPercentage}%</span>
+                        <span className="font-medium text-gray-700 dark:text-gray-300">{formatPercent(quotaPercentage)}</span>
                     </div>
                     <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
                         <div
@@ -90,7 +80,7 @@ export default function BestAccountCard({
                                 'h-full rounded-full transition-all duration-500',
                                 getQuotaColorClass(quotaPercentage).split(' ')[0]
                             )}
-                            style={{ width: `${quotaPercentage}%` }}
+                            style={{ width: `${quotaPercentage ?? 0}%` }}
                         />
                     </div>
                 </div>

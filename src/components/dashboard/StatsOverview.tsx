@@ -10,6 +10,7 @@ import { useAccountStore } from '../../stores/useAccountStore';
 import { showToast } from '../common/ToastContainer';
 import { formatNumber } from '../../utils/format';
 import { cn } from '../../utils/cn';
+import { computeAccountStats, formatPercent } from '../../utils/quota';
 
 interface StatCardProps {
     title: string;
@@ -50,44 +51,12 @@ function StatCard({ title, value, subtitle, icon, color }: StatCardProps) {
 export default function StatsOverview() {
     const { accounts, currentAccount, refreshAllQuotas, loading } = useAccountStore();
 
-    const stats = useMemo(() => {
-        const total = accounts.length;
-        const active = accounts.filter(a => a.isActive).length;
-        const disabled = accounts.filter(a => a.disabled).length;
-        const lowQuota = accounts.filter(a => {
-            const quota = a.quota?.remainingRequests || 0;
-            const total = a.quota?.totalRequests || 1;
-            return (quota / total) < 0.2;
-        }).length;
-
-        const totalRequests = accounts.reduce((sum, a) => sum + (a.usage?.dailyRequests || 0), 0);
-        const totalTokens = accounts.reduce((sum, a) => sum + (a.usage?.dailyTokens || 0), 0);
-
-        const avgQuota = accounts.length > 0
-            ? Math.round(
-                accounts.reduce((sum, a) => {
-                    const quota = a.quota?.remainingRequests || 0;
-                    const total = a.quota?.totalRequests || 1;
-                    return sum + (quota / total) * 100;
-                }, 0) / accounts.length
-            )
-            : 0;
-
-        return {
-            total,
-            active,
-            disabled,
-            lowQuota,
-            totalRequests,
-            totalTokens,
-            avgQuota,
-        };
-    }, [accounts]);
+    const stats = useMemo(() => computeAccountStats(accounts), [accounts]);
 
     const handleRefreshAll = async () => {
         try {
             await refreshAllQuotas();
-            showToast('All quotas refreshed', 'success');
+            showToast('Usage refresh is not connected to the backend yet', 'info');
         } catch (error) {
             showToast(`Failed to refresh: ${error}`, 'error');
         }
@@ -131,7 +100,7 @@ export default function StatsOverview() {
                 />
                 <StatCard
                     title="Average Quota"
-                    value={`${stats.avgQuota}%`}
+                    value={formatPercent(stats.avgQuota)}
                     subtitle={`${stats.lowQuota} accounts low on quota`}
                     icon={<Zap className="w-6 h-6" />}
                     color="purple"
