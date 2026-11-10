@@ -44,14 +44,21 @@ describe('quota colours', () => {
     expect(getQuotaColor(50)).toBe('success');
     expect(getQuotaColor(20)).toBe('warning');
     expect(getQuotaColor(5)).toBe('error');
-    expect(getQuotaColor(0)).toBe('neutral');
+  });
+
+  // Regression: an exhausted quota (0 %) looked the same as "no data".
+  it('treats an exhausted quota as an error and an unknown quota as neutral', () => {
+    expect(getQuotaColor(0)).toBe('error');
+    expect(getQuotaColor(null)).toBe('neutral');
+    expect(getQuotaColor(Number.NaN)).toBe('neutral');
   });
 
   it('maps severity to tailwind classes', () => {
     expect(getQuotaColorClass(90)).toContain('emerald');
     expect(getQuotaColorClass(30)).toContain('amber');
     expect(getQuotaColorClass(1)).toContain('rose');
-    expect(getQuotaColorClass(0)).toContain('gray');
+    expect(getQuotaColorClass(0)).toContain('rose');
+    expect(getQuotaColorClass(null)).toContain('gray');
   });
 });
 
@@ -65,6 +72,11 @@ describe('time formatting', () => {
     expect(formatTimeRemaining('2025-12-31T00:00:00Z')).toBe('Reset');
     expect(formatTimeRemaining('2026-01-01T02:30:00Z')).toBe('2h 30m');
     expect(formatTimeRemaining('2026-01-03T05:00:00Z')).toBe('2d 5h');
+  });
+
+  // Regression: an unparseable reset time rendered "NaNh NaNm".
+  it('returns N/A for an invalid date', () => {
+    expect(formatTimeRemaining('not a date')).toBe('N/A');
   });
 
   it('formats relative timestamps (unix seconds)', () => {
@@ -94,6 +106,13 @@ describe('string helpers', () => {
   it('masks API keys without leaking the middle', () => {
     expect(maskApiKey('sk-1234567890abcdef')).toBe('sk-1****cdef');
     expect(maskApiKey('short')).toBe('****');
+  });
+
+  // Regression: a 9-character key was shown as 8 of its 9 characters.
+  it('hides keys that are too short to mask safely', () => {
+    expect(maskApiKey('abcdefghi')).toBe('****');
+    expect(maskApiKey('123456789012345')).toBe('****');
+    expect(maskApiKey('1234567890123456')).toBe('1234****3456');
   });
 
   it('joins only truthy class names', () => {

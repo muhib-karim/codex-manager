@@ -12,7 +12,13 @@
   <script>
     (function () {
       try {
-        const savedTheme = localStorage.getItem('app-theme-preference');
+        // Same key and shape the settings store writes (src/utils/settings.ts).
+        let savedTheme = null;
+        const stored = localStorage.getItem('codex-manager-config');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed && typeof parsed.theme === 'string') savedTheme = parsed.theme;
+        }
         const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
         const shouldBeDark = savedTheme === 'dark' || ((!savedTheme || savedTheme === 'system') && systemDark);
         document.documentElement.style.backgroundColor = '#1a1f2e';

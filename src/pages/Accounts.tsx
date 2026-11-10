@@ -9,6 +9,31 @@ import Pagination from '../components/common/Pagination';
 import { showToast } from '../components/common/ToastContainer';
 import { OpenAIAccount } from '../types/account';
 import { cn } from '../utils/cn';
+import { maskApiKey } from '../utils/format';
+import { formatPercent, isLowQuota, ratioToPercent, requestQuotaRatio } from '../utils/quota';
+import {
+    clampPage,
+    matchesSearch,
+    pageCount,
+    pruneSelection,
+    safeFileName,
+    serializeAccountsForExport,
+} from '../utils/accountList';
+
+const PAGE_SIZE_OPTIONS = [12, 24, 48, 96];
+
+/** Save text as a file through a temporary link that is attached to the page. */
+function downloadTextFile(fileName: string, text: string) {
+    const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    // Give the download a moment to start before the URL is released.
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 
 type FilterType = 'all' | 'active' | 'disabled' | 'low-quota';
 type ViewMode = 'list' | 'grid';
@@ -42,27 +67,19 @@ export default function Accounts() {
 
     useEffect(() => {
         fetchAccounts();
-    }, []);
+    }, [fetchAccounts]);
 
     // Search and filter logic
     const searchedAccounts = useMemo(() => {
         if (!searchQuery) return accounts;
-        const lowQuery = searchQuery.toLowerCase();
-        return accounts.filter(a => 
-            a.name.toLowerCase().includes(lowQuery) ||
-            a.apiKey.toLowerCase().includes(lowQuery)
-        );
+        return accounts.filter(a => matchesSearch(a, searchQuery));
     }, [accounts, searchQuery]);
 
     const filterCounts = useMemo(() => ({
         all: searchedAccounts.length,
         active: searchedAccounts.filter(a => a.isActive).length,
         disabled: searchedAccounts.filter(a => a.disabled).length,
-        'low-quota': searchedAccounts.filter(a => {
-            const quota = a.quota?.remainingRequests || 0;
-            const total = a.quota?.totalRequests || 1;
-            return (quota / total) < 0.2;
-        }).length,
+        'low-quota': searchedAccounts.filter(isLowQuota).length,
     }), [searchedAccounts]);
 
     const filteredAccounts = useMemo(() => {
@@ -72,20 +89,27 @@ export default function Accounts() {
             case 'disabled':
                 return searchedAccounts.filter(a => a.disabled);
             case 'low-quota':
-                return searchedAccounts.filter(a => {
-                    const quota = a.quota?.remainingRequests || 0;
-                    const total = a.quota?.totalRequests || 1;
-                    return (quota / total) < 0.2;
-                });
+                return searchedAccounts.filter(isLowQuota);
             default:
                 return searchedAccounts;
         }
     }, [searchedAccounts, filter]);
 
+    // The page is clamped to the current list, so narrowing the list by a
+    // search, a filter or a delete can never leave an empty page on screen.
+    const safePage = clampPage(currentPage, filteredAccounts.length, itemsPerPage);
+
     const paginatedAccounts = useMemo(() => {
-        const startIndex = (currentPage - 1) * itemsPerPage;
+        const startIndex = (safePage - 1) * itemsPerPage;
         return filteredAccounts.slice(startIndex, startIndex + itemsPerPage);
-    }, [filteredAccounts, currentPage, itemsPerPage]);
+    }, [filteredAccounts, safePage, itemsPerPage]);
+
+    // Batch actions only ever apply to accounts that still exist and are in
+    // the list the user is looking at (not deleted, not hidden by a filter).
+    const activeSelection = useMemo(
+        () => pruneSelection(selectedIds, filteredAccounts.map(a => a.id)),
+        [selectedIds, filteredAccounts],
+    );
 
     const handleToggleSelect = (id: string) => {
         const newSet = new Set(selectedIds);
@@ -129,23 +153,24 @@ export default function Accounts() {
     const handleRefresh = async (accountId: string) => {
         try {
             await refreshQuota(accountId);
-            showToast('Quota refreshed', 'success');
+            showToast('Usage refresh is not connected to the backend yet', 'info');
         } catch (error) {
             showToast(`Failed to refresh: ${error}`, 'error');
         }
     };
 
     const handleBatchDelete = () => {
-        if (selectedIds.size === 0) return;
+        if (activeSelection.size === 0) return;
         setIsBatchDelete(true);
     };
 
     const executeBatchDelete = async () => {
         setIsBatchDelete(false);
         try {
-            await deleteAccounts(Array.from(selectedIds));
+            const ids = Array.from(activeSelection);
+            await deleteAccounts(ids);
             setSelectedIds(new Set());
-            showToast(`Deleted ${selectedIds.size} accounts`, 'success');
+            showToast(`Deleted ${ids.length} accounts`, 'success');
         } catch (error) {
             showToast(`Failed to delete: ${error}`, 'error');
         }
@@ -159,6 +184,8 @@ export default function Accounts() {
         if (!deleteConfirmId) return;
         try {
             await deleteAccount(deleteConfirmId);
+            const deletedId = deleteConfirmId;
+            setSelectedIds(prev => new Set([...prev].filter(id => id !== deletedId)));
             showToast('Account deleted', 'success');
         } catch (error) {
             showToast(`Failed to delete: ${error}`, 'error');
@@ -188,16 +215,17 @@ export default function Accounts() {
     };
 
     const handleBatchToggleStatus = async (enable: boolean) => {
-        if (selectedIds.size === 0) return;
+        const ids = Array.from(activeSelection);
+        if (ids.length === 0) return;
         try {
-            const promises = Array.from(selectedIds).map(id =>
+            const promises = ids.map(id =>
                 toggleAccountStatus(id, enable, enable ? undefined : 'Batch disabled')
             );
             await Promise.all(promises);
             showToast(
                 enable 
-                    ? `Enabled ${selectedIds.size} accounts` 
-                    : `Disabled ${selectedIds.size} accounts`,
+                    ? `Enabled ${ids.length} accounts` 
+                    : `Disabled ${ids.length} accounts`,
                 'success'
             );
             setSelectedIds(new Set());
@@ -207,42 +235,28 @@ export default function Accounts() {
     };
 
     const handleExport = () => {
-        const idsToExport = selectedIds.size > 0 ? Array.from(selectedIds) : accounts.map(a => a.id);
-        const accountsToExport = accounts.filter(a => idsToExport.includes(a.id));
-        const data = JSON.stringify(accountsToExport.map(a => ({
-            name: a.name,
-            apiKey: a.apiKey,
-            baseUrl: a.baseUrl,
-            organization: a.organization,
-        })), null, 2);
-        
-        const blob = new Blob([data], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `codex-accounts-${new Date().toISOString().split('T')[0]}.json`;
-        link.click();
-        URL.revokeObjectURL(url);
-        showToast('Accounts exported', 'success');
+        const accountsToExport = activeSelection.size > 0
+            ? accounts.filter(a => activeSelection.has(a.id))
+            : accounts;
+        if (accountsToExport.length === 0) {
+            showToast('There are no accounts to export', 'info');
+            return;
+        }
+        downloadTextFile(
+            `codex-accounts-${new Date().toISOString().split('T')[0]}.json`,
+            serializeAccountsForExport(accountsToExport),
+        );
+        showToast(`Exported ${accountsToExport.length} account(s). The file contains API keys in plain text.`, 'warning', 6000);
     };
 
     const handleExportOne = (accountId: string) => {
         const account = accounts.find(a => a.id === accountId);
         if (!account) return;
-        const data = JSON.stringify([{
-            name: account.name,
-            apiKey: account.apiKey,
-            baseUrl: account.baseUrl,
-            organization: account.organization,
-        }], null, 2);
-        
-        const blob = new Blob([data], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `account-${account.name}-${new Date().toISOString().split('T')[0]}.json`;
-        link.click();
-        URL.revokeObjectURL(url);
+        downloadTextFile(
+            `account-${safeFileName(account.name)}-${new Date().toISOString().split('T')[0]}.json`,
+            serializeAccountsForExport([account]),
+        );
+        showToast('Exported 1 account. The file contains the API key in plain text.', 'warning', 6000);
     };
 
     return (
@@ -332,28 +346,28 @@ export default function Accounts() {
 
                     <AddAccountDialog onAdd={handleAddAccount} />
 
-                    {selectedIds.size > 0 && (
+                    {activeSelection.size > 0 && (
                         <>
                             <button
                                 className="px-3 py-2 bg-rose-500 text-white text-xs font-medium rounded-xl hover:bg-rose-600 transition-colors flex items-center gap-1.5"
                                 onClick={handleBatchDelete}
                             >
                                 <Trash2 className="w-3.5 h-3.5" />
-                                Delete ({selectedIds.size})
+                                Delete ({activeSelection.size})
                             </button>
                             <button
                                 className="px-3 py-2 bg-amber-500 text-white text-xs font-medium rounded-xl hover:bg-amber-600 transition-colors flex items-center gap-1.5"
                                 onClick={() => handleBatchToggleStatus(false)}
                             >
                                 <ToggleLeft className="w-3.5 h-3.5" />
-                                Disable ({selectedIds.size})
+                                Disable ({activeSelection.size})
                             </button>
                             <button
                                 className="px-3 py-2 bg-emerald-500 text-white text-xs font-medium rounded-xl hover:bg-emerald-600 transition-colors flex items-center gap-1.5"
                                 onClick={() => handleBatchToggleStatus(true)}
                             >
                                 <ToggleRight className="w-3.5 h-3.5" />
-                                Enable ({selectedIds.size})
+                                Enable ({activeSelection.size})
                             </button>
                         </>
                     )}
@@ -432,7 +446,7 @@ export default function Accounts() {
                                         </td>
                                         <td className="px-4 py-3">
                                             <div className="font-medium text-gray-900 dark:text-white">{account.name}</div>
-                                            <div className="text-xs text-gray-500">{account.apiKey.slice(0, 10)}...{account.apiKey.slice(-4)}</div>
+                                            <div className="text-xs text-gray-500">{maskApiKey(account.apiKey)}</div>
                                         </td>
                                         <td className="px-4 py-3">
                                             <div className="flex gap-2">
@@ -451,7 +465,7 @@ export default function Accounts() {
                                         </td>
                                         <td className="px-4 py-3">
                                             <div className="text-sm text-gray-900 dark:text-white">
-                                                {Math.round(((account.quota?.remainingRequests || 0) / (account.quota?.totalRequests || 1)) * 100)}%
+                                                {formatPercent(ratioToPercent(requestQuotaRatio(account.quota)))}
                                             </div>
                                             <div className="text-xs text-gray-500">
                                                 {account.quota?.remainingRequests || 0} / {account.quota?.totalRequests || 0}
@@ -496,12 +510,16 @@ export default function Accounts() {
             {/* Pagination */}
             {filteredAccounts.length > 0 && (
                 <Pagination
-                    currentPage={currentPage}
-                    totalPages={Math.ceil(filteredAccounts.length / itemsPerPage)}
+                    currentPage={safePage}
+                    totalPages={pageCount(filteredAccounts.length, itemsPerPage)}
                     onPageChange={setCurrentPage}
                     totalItems={filteredAccounts.length}
                     itemsPerPage={itemsPerPage}
-                    onPageSizeChange={setItemsPerPage}
+                    onPageSizeChange={(size) => {
+                        setItemsPerPage(size);
+                        setCurrentPage(1);
+                    }}
+                    pageSizeOptions={PAGE_SIZE_OPTIONS}
                 />
             )}
 
@@ -515,7 +533,7 @@ export default function Accounts() {
                 isOpen={!!deleteConfirmId || isBatchDelete}
                 title={isBatchDelete ? 'Delete Multiple Accounts' : 'Delete Account'}
                 message={isBatchDelete 
-                    ? `Are you sure you want to delete ${selectedIds.size} accounts? This action cannot be undone.`
+                    ? `Are you sure you want to delete ${activeSelection.size} accounts? This action cannot be undone.`
                     : 'Are you sure you want to delete this account? This action cannot be undone.'}
                 type="confirm"
                 confirmText="Delete"

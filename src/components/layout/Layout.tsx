@@ -11,6 +11,7 @@ import {
 import { cn } from '../../utils/cn';
 import { useConfigStore } from '../../stores/useConfigStore';
 import ToastContainer from '../common/ToastContainer';
+import { nextTheme, resolveTheme } from '../../utils/settings';
 
 const navItems = [
     { path: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -30,10 +31,10 @@ function Sidebar() {
         return location.pathname.startsWith(path);
     };
 
-    const toggleTheme = () => {
-        const newTheme = config.theme === 'light' ? 'dark' : 'light';
-        updateTheme(newTheme);
-    };
+    // The toggle works on what is shown, so "system" switches in one click.
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const shownTheme = resolveTheme(config.theme, prefersDark);
+    const toggleTheme = () => updateTheme(nextTheme(config.theme, prefersDark));
 
     return (
         <aside className="w-64 h-screen bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col">
@@ -78,7 +79,7 @@ function Sidebar() {
                     onClick={toggleTheme}
                     className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all"
                 >
-                    {config.theme === 'light' ? (
+                    {shownTheme === 'light' ? (
                         <>
                             <Moon className="w-5 h-5" />
                             Dark Mode

@@ -10,7 +10,8 @@ import {
     ToggleRight
 } from 'lucide-react';
 import { OpenAIAccount } from '../../types/account';
-import { getQuotaColorClass, formatTimeRemaining, formatNumber, maskApiKey } from '../../utils/format';
+import { getQuotaColorClass, formatRelativeTime, formatTimeRemaining, formatNumber, maskApiKey } from '../../utils/format';
+import { ratioToPercent, requestQuotaRatio, tokenQuotaRatio } from '../../utils/quota';
 import { cn } from '../../utils/cn';
 
 interface AccountCardProps {
@@ -42,13 +43,9 @@ export default function AccountCard({
     onDelete,
     onToggleStatus,
 }: AccountCardProps) {
-    const quotaPercentage = account.quota?.remainingRequests && account.quota?.totalRequests
-        ? Math.round((account.quota.remainingRequests / account.quota.totalRequests) * 100)
-        : 0;
-
-    const tokenPercentage = account.quota?.remainingTokens && account.quota?.totalTokens
-        ? Math.round((account.quota.remainingTokens / account.quota.totalTokens) * 100)
-        : 0;
+    // null when the quota is unknown; always within 0-100 otherwise.
+    const quotaPercentage = ratioToPercent(requestQuotaRatio(account.quota));
+    const tokenPercentage = ratioToPercent(tokenQuotaRatio(account.quota));
 
     const tierColors: Record<string, string> = {
         free: 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400',
@@ -135,7 +132,7 @@ export default function AccountCard({
                                 'h-full rounded-full transition-all duration-500',
                                 getQuotaColorClass(quotaPercentage).split(' ')[0]
                             )}
-                            style={{ width: `${quotaPercentage}%` }}
+                            style={{ width: `${quotaPercentage ?? 0}%` }}
                         />
                     </div>
                 </div>
@@ -154,7 +151,7 @@ export default function AccountCard({
                                 'h-full rounded-full transition-all duration-500',
                                 getQuotaColorClass(tokenPercentage).split(' ')[0]
                             )}
-                            style={{ width: `${tokenPercentage}%` }}
+                            style={{ width: `${tokenPercentage ?? 0}%` }}
                         />
                     </div>
                 </div>
@@ -187,7 +184,7 @@ export default function AccountCard({
             {/* Actions */}
             <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-800">
                 <span className="text-xs text-gray-400 dark:text-gray-500">
-                    {account.lastUsed ? `Last used ${formatTimeRemaining(new Date(account.lastUsed * 1000).toISOString())}` : 'Never used'}
+                    {account.lastUsed ? `Last used ${formatRelativeTime(account.lastUsed).toLowerCase()}` : 'Never used'}
                 </span>
 
                 <div className="flex items-center gap-1">

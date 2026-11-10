@@ -3,6 +3,15 @@ import { Save, Globe, Bell, Palette, Server } from 'lucide-react';
 import { useConfigStore } from '../stores/useConfigStore';
 import { showToast } from '../components/common/ToastContainer';
 import { cn } from '../utils/cn';
+import { SCHEDULING_MODES, type SchedulingMode } from '../types/config';
+import { PORT_RANGE, REFRESH_INTERVAL_RANGE, normalizeSchedulingMode, parseBoundedInt } from '../utils/settings';
+
+const SCHEDULING_LABELS: Record<SchedulingMode, string> = {
+    least_utilized: 'Least Utilized',
+    round_robin: 'Round Robin',
+    priority: 'Priority',
+    sticky: 'Sticky Sessions',
+};
 
 type TabType = 'general' | 'proxy' | 'notifications' | 'appearance';
 
@@ -13,7 +22,7 @@ export default function Settings() {
 
     useEffect(() => {
         loadConfig();
-    }, []);
+    }, [loadConfig]);
 
     const handleSave = async () => {
         setIsSaving(true);
@@ -160,12 +169,17 @@ export default function Settings() {
                                         </label>
                                         <input
                                             type="number"
-                                            min="1"
-                                            max="60"
+                                            min={REFRESH_INTERVAL_RANGE.min}
+                                            max={REFRESH_INTERVAL_RANGE.max}
                                             value={config.refreshInterval}
                                             onChange={(e) => {
-                                                const newConfig = { ...config, refreshInterval: parseInt(e.target.value) || 5 };
-                                                saveConfig(newConfig);
+                                                const refreshInterval = parseBoundedInt(
+                                                    e.target.value,
+                                                    REFRESH_INTERVAL_RANGE.min,
+                                                    REFRESH_INTERVAL_RANGE.max,
+                                                    config.refreshInterval,
+                                                );
+                                                saveConfig({ ...config, refreshInterval });
                                             }}
                                             className="w-32 px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         />
@@ -183,7 +197,7 @@ export default function Settings() {
                                 <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-xl">
                                     <div>
                                         <p className="font-medium text-gray-900 dark:text-white">Enable Proxy</p>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400">Start the OpenAI API proxy server</p>
+                                        <p className="text-sm text-gray-500 dark:text-gray-400">Saved as a preference only: the UI cannot start the proxy server yet</p>
                                     </div>
                                     <label className="relative inline-flex items-center cursor-pointer">
                                         <input
@@ -210,8 +224,12 @@ export default function Settings() {
                                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Port</label>
                                         <input
                                             type="number"
+                                            min={PORT_RANGE.min}
+                                            max={PORT_RANGE.max}
                                             value={config.proxy.port}
-                                            onChange={(e) => updateProxy({ port: parseInt(e.target.value) || 8080 })}
+                                            onChange={(e) => updateProxy({
+                                                port: parseBoundedInt(e.target.value, PORT_RANGE.min, PORT_RANGE.max, config.proxy.port),
+                                            })}
                                             className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         />
                                     </div>
@@ -233,15 +251,13 @@ export default function Settings() {
                                     <select
                                         value={config.proxy.scheduling.mode}
                                         onChange={(e) => updateProxy({ 
-                                            scheduling: { ...config.proxy.scheduling, mode: e.target.value as any }
+                                            scheduling: { ...config.proxy.scheduling, mode: normalizeSchedulingMode(e.target.value) }
                                         })}
                                         className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     >
-                                        <option value="round-robin">Round Robin</option>
-                                        <option value="least-used">Least Used</option>
-                                        <option value="priority">Priority</option>
-                                        <option value="random">Random</option>
-                                        <option value="weighted">Weighted</option>
+                                        {SCHEDULING_MODES.map(mode => (
+                                            <option key={mode} value={mode}>{SCHEDULING_LABELS[mode]}</option>
+                                        ))}
                                     </select>
                                 </div>
 

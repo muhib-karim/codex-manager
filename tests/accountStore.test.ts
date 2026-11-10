@@ -23,6 +23,19 @@ describe('useAccountStore', () => {
     expect(store().currentAccount?.id).toBe(a.id);
   });
 
+  // Regression: the first account became "current" but stayed isActive: false,
+  // so the card said ACTIVE while the Active filter and the stats showed 0.
+  it('marks the first account active and keeps exactly one active account', async () => {
+    const a = await store().addAccount(input('alpha'));
+    const b = await store().addAccount(input('bravo'));
+    expect(a.isActive).toBe(true);
+    expect(b.isActive).toBe(false);
+    expect(store().accounts.filter(x => x.isActive).map(x => x.id)).toEqual([a.id]);
+    expect(store().currentAccount?.isActive).toBe(true);
+    await store().switchAccount(b.id);
+    expect(store().accounts.filter(x => x.isActive).map(x => x.id)).toEqual([b.id]);
+  });
+
   it('switches the active account and records lastUsed', async () => {
     const a = await store().addAccount(input('alpha'));
     const b = await store().addAccount(input('bravo'));
@@ -45,9 +58,22 @@ describe('useAccountStore', () => {
     const a = await store().addAccount(input('alpha'));
     await store().toggleAccountStatus(a.id, false, 'quota exhausted');
     expect(store().accounts[0]).toMatchObject({ disabled: true, disabledReason: 'quota exhausted' });
-    expect(store().currentAccount?.disabled).toBe(true);
     await store().toggleAccountStatus(a.id, true);
     expect(store().accounts[0]).toMatchObject({ disabled: false, disabledReason: undefined });
+  });
+
+  // Regression: a disabled account stayed the current, active account.
+  it('clears the current account when it is disabled', async () => {
+    const a = await store().addAccount(input('alpha'));
+    const b = await store().addAccount(input('bravo'));
+    await store().toggleAccountStatus(a.id, false, 'manual');
+    expect(store().currentAccount).toBeNull();
+    expect(store().accounts.find(x => x.id === a.id)?.isActive).toBe(false);
+    // Disabling a different account leaves the current one alone.
+    await store().switchAccount(b.id);
+    await store().toggleAccountStatus(a.id, true);
+    await store().toggleAccountStatus(a.id, false);
+    expect(store().currentAccount?.id).toBe(b.id);
   });
 
   it('deletes single and multiple accounts and clears a deleted current account', async () => {
@@ -66,5 +92,7 @@ describe('useAccountStore', () => {
     const parsed = JSON.parse(await store().exportAccounts());
     expect(parsed).toHaveLength(1);
     expect(parsed[0].name).toBe('alpha');
+    // Same shape as the Accounts page export: no runtime state.
+    expect(Object.keys(parsed[0]).sort()).toEqual(['apiKey', 'name']);
   });
 });

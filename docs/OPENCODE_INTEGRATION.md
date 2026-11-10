@@ -2,8 +2,12 @@
 
 This guide shows how to configure OpenCode to use Codex Account Manager for multi-account OpenAI API management.
 
-> **Note:** the commands below target the standalone CLI prototype (root `Cargo.toml`), which does not
-> compile yet. See the [README](../README.md#roadmap--known-limitations) for the current status.
+> **Outdated.** The commands below target the standalone CLI prototype (`codex-account-manager`,
+> `CAM_MASTER_KEY`, default key `sk-codex-account-manager`), which has been removed from the
+> repository. The OpenCode options shown were never verified. With the current code the proxy is
+> part of the desktop app, uses the key `sk-codex-manager` by default and cannot be started from
+> the UI yet. See the [README](../README.md#known-limitations-and-roadmap) and
+> [API.md](API.md) for what exists today.
 
 ## Overview
 

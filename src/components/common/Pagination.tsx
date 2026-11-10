@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '../../utils/cn';
+import { pageRange } from '../../utils/accountList';
 
 interface PaginationProps {
     currentPage: number;
@@ -24,7 +25,7 @@ export default function Pagination({
 
     // Calculate displayed page range (max 5 pages)
     let startPage = Math.max(1, currentPage - 2);
-    let endPage = Math.min(totalPages, startPage + 4);
+    const endPage = Math.min(totalPages, startPage + 4);
 
     if (endPage - startPage < 4) {
         startPage = Math.max(1, endPage - 4);
@@ -35,8 +36,7 @@ export default function Pagination({
         pages.push(i);
     }
 
-    const startIndex = (currentPage - 1) * itemsPerPage + 1;
-    const endIndex = Math.min(currentPage * itemsPerPage, totalItems);
+    const { start: startIndex, end: endIndex } = pageRange(currentPage, totalItems, itemsPerPage);
 
     return (
         <div className="flex items-center justify-between px-4 py-3 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800">
@@ -44,10 +44,10 @@ export default function Pagination({
             <div className="flex flex-1 justify-between sm:hidden">
                 <button
                     onClick={() => onPageChange(currentPage - 1)}
-                    disabled={currentPage === 1}
+                    disabled={currentPage <= 1}
                     className={cn(
                         'relative inline-flex items-center rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm font-medium',
-                        currentPage === 1
+                        currentPage <= 1
                             ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
                             : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800'
                     )}
@@ -56,10 +56,10 @@ export default function Pagination({
                 </button>
                 <button
                     onClick={() => onPageChange(currentPage + 1)}
-                    disabled={currentPage === totalPages}
+                    disabled={currentPage >= totalPages}
                     className={cn(
                         'relative ml-3 inline-flex items-center rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm font-medium',
-                        currentPage === totalPages
+                        currentPage >= totalPages
                             ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
                             : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800'
                     )}
@@ -99,7 +99,7 @@ export default function Pagination({
                     <nav className="isolate inline-flex -space-x-px rounded-lg shadow-sm" aria-label="Pagination">
                         <button
                             onClick={() => onPageChange(currentPage - 1)}
-                            disabled={currentPage === 1}
+                            disabled={currentPage <= 1}
                             className={cn(
                                 'relative inline-flex items-center rounded-l-lg px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 dark:ring-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 focus:z-20 focus:outline-offset-0',
                                 currentPage === 1 && 'cursor-not-allowed opacity-50'
@@ -163,7 +163,7 @@ export default function Pagination({
 
                         <button
                             onClick={() => onPageChange(currentPage + 1)}
-                            disabled={currentPage === totalPages}
+                            disabled={currentPage >= totalPages}
                             className={cn(
                                 'relative inline-flex items-center rounded-r-lg px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 dark:ring-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 focus:z-20 focus:outline-offset-0',
                                 currentPage === totalPages && 'cursor-not-allowed opacity-50'

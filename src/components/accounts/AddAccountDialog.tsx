@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Plus, Key, Upload, X, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { OpenAIAccount } from '../../types/account';
 import { cn } from '../../utils/cn';
 import { showToast } from '../common/ToastContainer';
+import { useAccountStore } from '../../stores/useAccountStore';
+import { parseAccountImport } from '../../utils/importAccounts';
 
 interface AddAccountDialogProps {
     onAdd: (account: Omit<OpenAIAccount, 'id' | 'createdAt'>) => Promise<void>;
@@ -35,15 +37,44 @@ export default function AddAccountDialog({ onAdd }: AddAccountDialogProps) {
         setMessage('');
     };
 
+    // Timers started by this dialog. They are cancelled when the dialog is
+    // reopened or unmounted, so a timer from an earlier session can never
+    // close or reset a dialog the user has opened again.
+    const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+    const clearTimers = () => {
+        timers.current.forEach(clearTimeout);
+        timers.current = [];
+    };
+    const later = (fn: () => void, delay: number) => {
+        timers.current.push(setTimeout(fn, delay));
+    };
+    useEffect(() => clearTimers, []);
+
+    const existingKeys = () => useAccountStore.getState().accounts.map(account => account.apiKey);
+
+    const handleOpen = () => {
+        clearTimers();
+        resetForm();
+        setActiveTab('manual');
+        setIsOpen(true);
+    };
+
     const handleClose = () => {
+        clearTimers();
         setIsOpen(false);
-        setTimeout(resetForm, 300);
+        later(resetForm, 300);
     };
 
     const handleSubmit = async () => {
         if (!name.trim() || !apiKey.trim()) {
             setStatus('error');
             setMessage('Name and API Key are required');
+            return;
+        }
+
+        if (existingKeys().includes(apiKey.trim())) {
+            setStatus('error');
+            setMessage('An account with this API key already exists');
             return;
         }
 
@@ -63,9 +94,7 @@ export default function AddAccountDialog({ onAdd }: AddAccountDialogProps) {
             setMessage('Account added successfully!');
             showToast('Account added successfully', 'success');
 
-            setTimeout(() => {
-                handleClose();
-            }, 1500);
+            later(handleClose, 1500);
         } catch (error) {
             setStatus('error');
             setMessage(`Failed to add account: ${error}`);
@@ -84,49 +113,34 @@ export default function AddAccountDialog({ onAdd }: AddAccountDialogProps) {
         setMessage('Importing accounts...');
 
         try {
-            let accounts: Partial<OpenAIAccount>[] = [];
-            
-            // Try JSON parse
-            try {
-                const parsed = JSON.parse(importData);
-                if (Array.isArray(parsed)) {
-                    accounts = parsed;
-                } else if (typeof parsed === 'object') {
-                    accounts = [parsed];
-                }
-            } catch {
-                // Try line-by-line parsing
-                const lines = importData.split('\n').filter(l => l.trim());
-                accounts = lines.map((line, i) => ({
-                    name: `Imported Account ${i + 1}`,
-                    apiKey: line.trim(),
-                }));
-            }
+            // Validates the input and drops entries without a usable key and
+            // duplicates; malformed JSON is rejected as a whole.
+            const { accounts, rejected } = parseAccountImport(importData, existingKeys());
 
             let successCount = 0;
             for (const acc of accounts) {
-                try {
-                    await onAdd({
-                        name: acc.name || 'Unnamed Account',
-                        apiKey: acc.apiKey || '',
-                        baseUrl: acc.baseUrl || 'https://api.openai.com/v1',
-                        organization: acc.organization,
-                        isActive: false,
-                    });
-                    successCount++;
-                } catch (e) {
-                    console.error('Failed to import account:', e);
-                }
+                await onAdd({
+                    name: acc.name,
+                    apiKey: acc.apiKey,
+                    baseUrl: acc.baseUrl || 'https://api.openai.com/v1',
+                    organization: acc.organization,
+                    isActive: false,
+                });
+                successCount++;
             }
+
+            const skipped = rejected.length > 0
+                ? ` Skipped ${rejected.length}: ${[...new Set(rejected.map(r => r.reason))].join(', ')}.`
+                : '';
 
             if (successCount > 0) {
                 setStatus('success');
-                setMessage(`Successfully imported ${successCount} account(s)`);
+                setMessage(`Imported ${successCount} account(s).${skipped}`);
                 showToast(`Imported ${successCount} account(s)`, 'success');
-                setTimeout(() => handleClose(), 1500);
+                later(handleClose, rejected.length > 0 ? 4000 : 1500);
             } else {
                 setStatus('error');
-                setMessage('Failed to import any accounts');
+                setMessage(`Nothing was imported.${skipped}`);
             }
         } catch (error) {
             setStatus('error');
@@ -161,7 +175,7 @@ export default function AddAccountDialog({ onAdd }: AddAccountDialogProps) {
     return (
         <>
             <button
-                onClick={() => setIsOpen(true)}
+                onClick={handleOpen}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl transition-colors shadow-sm"
             >
                 <Plus className="w-4 h-4" />

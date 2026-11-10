@@ -1,4 +1,9 @@
-export type SchedulingMode = 'round-robin' | 'least-used' | 'priority' | 'random' | 'weighted';
+/**
+ * Routing strategies. These are the four the Rust backend implements
+ * (`RoutingStrategy` in src-tauri/src/models.rs) and use its wire names.
+ */
+export const SCHEDULING_MODES = ['least_utilized', 'round_robin', 'priority', 'sticky'] as const;
+export type SchedulingMode = (typeof SCHEDULING_MODES)[number];
 export type ThemeMode = 'light' | 'dark' | 'system';
 
 export interface ProxyConfig {
@@ -66,7 +71,7 @@ export const defaultConfig: AppConfig = {
             url: '',
         },
         scheduling: {
-            mode: 'round-robin',
+            mode: 'least_utilized',
             maxRetries: 3,
             retryDelay: 1000,
             healthCheckInterval: 60,
