@@ -1,5 +1,11 @@
 # Architecture Documentation
 
+> **Outdated.** This document describes the earlier standalone CLI/TUI design, which has been
+> removed from the repository. Paths, commands, environment variables (`CAM_*`) and several
+> features described here (TUI, hot reload, connection pooling, automatic retries) do not match
+> the current code. The current architecture is described in the
+> [README](../README.md#architecture); this file is kept for the design rationale until it is rewritten.
+
 ## System Overview
 
 Codex Manager is a local proxy service that manages multiple OpenAI API accounts, providing intelligent routing, usage monitoring, and failover capabilities.

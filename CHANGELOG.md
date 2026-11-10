@@ -7,17 +7,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-- `src/pages/About.tsx` had lost the closing `>` on most JSX tags and broke `tsc`.
-- Account store rewritten against the `OpenAIAccount` type the pages use (was out of sync, 50+ type errors).
-- Removed unused imports that failed `noUnusedLocals`.
-
 ### Added
-- Vitest unit tests (`tests/`) for formatting helpers and the account store.
-- `typecheck` and `test` npm scripts; CI workflow now runs type-check, tests and build on ubuntu-latest.
-- MIT `LICENSE` file and `docs/banner.svg`.
+- Rust unit tests in every backend module (storage and encryption, routing strategies and circuit
+  breaker, proxy against a mock upstream, usage math, command helpers, master key handling).
+- Vitest regression tests for quota math, list/pagination/selection, account import, settings and
+  theme, the account store, and a contract test that compares `src/lib/backend.ts` with the
+  commands and routing strategies in the Rust sources (17 -> 65 tests).
+- `src/lib/backend.ts`: typed map of the Tauri commands and their argument shapes.
+- ESLint (flat config) with an `npm run lint` script.
+- CI: `rust` job (`cargo check`, `clippy`, `test` with `--locked`), `gitleaks` job over the full
+  history, lint step, Node 20 and 22, production dependency audit; actions pinned to commit SHAs,
+  timeouts, concurrency group, read-only token.
+- `typecheck` and `test` npm scripts, MIT `LICENSE` file and `docs/banner.svg` (earlier in this cycle).
+
+### Changed
+- Backend commands live in `src-tauri/src/commands.rs` and return accounts with the API key masked;
+  only `export_accounts` returns keys. `refresh_all_usage` returns a flat list of results.
+- The proxy forwards any path with its method, query string, body and content type and returns the
+  upstream status, streamed body and selected headers. The hard-coded model list is gone.
+- `/health` and `/healthz` no longer need the proxy key; the proxy sends no CORS headers.
+- Master key: `CODEX_MANAGER_MASTER_KEY`, otherwise a random per-install key file. There is no
+  built-in default key any more.
+- Scheduling modes in the UI are the four strategies the backend implements
+  (`least_utilized`, `round_robin`, `priority`, `sticky`); stored legacy values are mapped.
+- Release workflow: installs frontend dependencies, uses the dispatch tag, checks the tag against
+  the manifests, awaits publishing, minimal permissions, pinned actions.
+- README, `docs/BUILD.md` and `docs/API.md` rewritten to match the code; `docs/ARCHITECTURE.md` and
+  `docs/OPENCODE_INTEGRATION.md` marked as outdated.
+
+### Fixed
+- Backend did not compile: duplicate `models` module, missing `aes-gcm`/`argon2` dependencies,
+  `chrono` without `serde`, a store API from a plugin that was not a dependency, fields and methods
+  that did not exist, non-RGBA bundle icons.
+- The encryption salt was regenerated on every start, so stored API keys could not be decrypted
+  after a restart. The salt is now stored with the database and a wrong master key is detected.
+- `set_routing_strategy` did nothing; round-robin panicked (`blocking_read` in async code);
+  least-utilized ignored per-account limits and always picked the first account; requests without a
+  session were pinned to one account; a tripped circuit breaker could stay open forever; 401/403/429
+  did not count against an account.
+- Proxy forced every request to `POST` with a JSON body, dropped the query string and replaced the
+  upstream status with `200`; the proxy start command asked for state that was never registered.
+- Usage: today's spend was excluded (exclusive end date), `daily_usage` was never filled, and a
+  failed refresh was stored as a zero-usage snapshot.
+- A monthly limit was dropped unless a daily limit was also set.
+- The app window was created hidden and never shown; the tray icon was never created.
+- UI: unknown quota counted as 0 % (or as 50000 % when only the total was missing); "best account"
+  could be an exhausted one; "Last used" always read "Reset"; the accounts page showed an empty
+  page after filtering; deleted accounts stayed selected and batch actions hit hidden accounts;
+  search matched API keys; the list view showed 14 characters of each key; import accepted junk and
+  duplicates; port and refresh interval accepted any number; the theme needed two clicks from
+  "system" and the boot script read a key nothing wrote; the first account was current but not active.
+- `src/pages/About.tsx` JSX, the account store types and unused imports (earlier in this cycle).
+
+### Removed
+- The standalone CLI/TUI crate at the repository root (`Cargo.toml`, `src/**/*.rs`): a duplicate of
+  the backend that never compiled.
+- `PROJECT_SUMMARY.md`, `RELEASE_CHECKLIST.md`, dead backend stubs, the empty `icon.icns`
+  placeholder, the `set_master_key` command and the invented per-token cost estimate.
+
+### Security
+- No hard-coded fallback master key; master key file is created with `0600` permissions.
+- Permissive CORS removed from the proxy; request bodies capped at 64 MiB; API keys are masked in
+  command results, debug output and the accounts list.
+- Lockfile advisories patched without major upgrades: `openssl`, `rustls`, `rustls-webpki`, `h2`,
+  `bytes`, `time`, `tokio`, `anyhow`, `rand`, `crossbeam-epoch`, `event-listener`, `serde_with`.
+  Remaining advisories are listed in the README.
 
 ## [0.3.0] - 2025-02-03
+
+> **Note:** 0.3.0 was tagged but never built or released. The entries below describe the design
+> as it was written at the time, including the standalone CLI that has since been removed; several
+> of the features listed did not work (see the fixes under Unreleased).
 
 ### Added
 
