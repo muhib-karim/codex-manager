@@ -207,7 +207,7 @@ mod tests {
     fn blank_environment_value_is_ignored() {
         let dir = TempDir::new();
         let key = load_or_create_master_key(&dir.path, Some("   ".to_string())).unwrap();
-        assert_ne!(key.trim(), "");
+        assert!(!key.trim().is_empty());
         assert!(dir.path.join(MASTER_KEY_FILE).exists());
     }
 

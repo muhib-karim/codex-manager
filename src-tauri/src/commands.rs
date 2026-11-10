@@ -598,7 +598,7 @@ mod tests {
 
     #[test]
     fn import_skips_blank_and_duplicate_keys_and_assigns_new_ids() {
-        let existing = vec!["sk-existing".to_string()];
+        let existing = ["sk-existing".to_string()];
         let fresh = Account::new("Fresh".to_string(), "sk-fresh".to_string());
         let fresh_id = fresh.id;
         let incoming = vec![
